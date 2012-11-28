@@ -85,6 +85,14 @@
 
 @end
 
+static id PropertyListFromData(NSData *data) {
+	return data ? [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:NULL] : nil;
+}
+
+static NSData* DataFromPropertyList(id propertyList) {
+	return propertyList ? [NSPropertyListSerialization dataWithPropertyList:propertyList format:NSPropertyListBinaryFormat_v1_0 options:0 error:NULL] : nil;
+}
+
 @implementation Mixpanel
 
 static Mixpanel *sharedInstance = nil;
@@ -674,17 +682,17 @@ static Mixpanel *sharedInstance = nil;
 
 - (NSString *)eventsFilePath
 {
-    return [self filePathForData:@"events"];
+    return [self filePathForData:@"events-path"];
 }
 
 - (NSString *)peopleFilePath
 {
-    return [self filePathForData:@"people"];
+    return [self filePathForData:@"people-path"];
 }
 
 - (NSString *)propertiesFilePath
 {
-    return [self filePathForData:@"properties"];
+    return [self filePathForData:@"properties-path"];
 }
 
 - (void)archive
@@ -701,7 +709,7 @@ static Mixpanel *sharedInstance = nil;
     @synchronized(self) {
         NSString *filePath = [self eventsFilePath];
         MixpanelDebug(@"%@ archiving events data to %@: %@", self, filePath, self.eventsQueue);
-        if (![NSKeyedArchiver archiveRootObject:self.eventsQueue toFile:filePath]) {
+		if (![DataFromPropertyList(self.eventsQueue) writeToFile:filePath atomically:NO]) {
             NSLog(@"%@ unable to archive events data", self);
         }
     }
@@ -712,7 +720,7 @@ static Mixpanel *sharedInstance = nil;
     @synchronized(self) {
         NSString *filePath = [self peopleFilePath];
         MixpanelDebug(@"%@ archiving people data to %@: %@", self, filePath, self.peopleQueue);
-        if (![NSKeyedArchiver archiveRootObject:self.peopleQueue toFile:filePath]) {
+		if (![DataFromPropertyList(self.peopleQueue) writeToFile:filePath atomically:NO]) {
             NSLog(@"%@ unable to archive people data", self);
         }
     }
@@ -729,7 +737,7 @@ static Mixpanel *sharedInstance = nil;
         [properties setValue:self.people.distinctId forKey:@"peopleDistinctId"];
         [properties setValue:self.people.unidentifiedQueue forKey:@"peopleUnidentifiedQueue"];
         MixpanelDebug(@"%@ archiving properties data to %@: %@", self, filePath, properties);
-        if (![NSKeyedArchiver archiveRootObject:properties toFile:filePath]) {
+		if (![DataFromPropertyList(properties) writeToFile:filePath atomically:NO]) {
             NSLog(@"%@ unable to archive properties data", self);
         }
     }
@@ -748,7 +756,7 @@ static Mixpanel *sharedInstance = nil;
 {
     NSString *filePath = [self eventsFilePath];
     @try {
-        self.eventsQueue = [NSKeyedUnarchiver unarchiveObjectWithFile:filePath];
+        self.eventsQueue = [NSMutableArray arrayWithArray:PropertyListFromData([NSData dataWithContentsOfMappedFile:filePath])];
         MixpanelDebug(@"%@ unarchived events data: %@", self, self.eventsQueue);
     }
     @catch (NSException *exception) {
@@ -765,7 +773,7 @@ static Mixpanel *sharedInstance = nil;
 {
     NSString *filePath = [self peopleFilePath];
     @try {
-        self.peopleQueue = [NSKeyedUnarchiver unarchiveObjectWithFile:filePath];
+        self.peopleQueue = [NSMutableArray arrayWithArray:PropertyListFromData([NSData dataWithContentsOfMappedFile:filePath])];
         MixpanelDebug(@"%@ unarchived people data: %@", self, self.peopleQueue);
     }
     @catch (NSException *exception) {
@@ -783,7 +791,7 @@ static Mixpanel *sharedInstance = nil;
     NSString *filePath = [self propertiesFilePath];
     NSDictionary *properties = nil;
     @try {
-        properties = [NSKeyedUnarchiver unarchiveObjectWithFile:filePath];
+        properties = PropertyListFromData([NSData dataWithContentsOfMappedFile:filePath]);
         MixpanelDebug(@"%@ unarchived properties data: %@", self, properties);
     }
     @catch (NSException *exception) {
@@ -793,9 +801,17 @@ static Mixpanel *sharedInstance = nil;
     if (properties) {
         self.distinctId = [properties objectForKey:@"distinctId"];
         self.nameTag = [properties objectForKey:@"nameTag"];
-        self.superProperties = [properties objectForKey:@"superProperties"];
+        self.superProperties = [NSMutableDictionary dictionaryWithDictionary:[properties objectForKey:@"superProperties"]];
         self.people.distinctId = [properties objectForKey:@"peopleDistinctId"];
-        self.people.unidentifiedQueue = [properties objectForKey:@"peopleUnidentifiedQueue"];
+		
+		NSArray *unidentifiedQueue = [properties objectForKey:@"peopleUnidentifiedQueue"];
+		NSMutableArray *mutableQueue = unidentifiedQueue ? [NSMutableArray array] : nil;
+		for (NSDictionary *dict in unidentifiedQueue) {
+			NSMutableDictionary *mutableDict = [NSMutableDictionary dictionaryWithDictionary:dict];
+			[mutableQueue addObject:mutableDict];
+		}
+		
+        self.people.unidentifiedQueue = mutableQueue;
     }
 }
 
