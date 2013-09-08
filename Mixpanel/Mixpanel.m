@@ -22,7 +22,6 @@
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 
-#import <AdSupport/ASIdentifierManager.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <CoreTelephony/CTCarrier.h>
 #import <CoreTelephony/CTTelephonyNetworkInfo.h>
@@ -129,10 +128,6 @@ static Mixpanel *sharedInstance = nil;
 
     if (carrier.carrierName.length) {
         [properties setValue:carrier.carrierName forKey:@"$carrier"];
-    }
-
-    if (NSClassFromString(@"ASIdentifierManager")) {
-        [properties setValue:ASIdentifierManager.sharedManager.advertisingIdentifier.UUIDString forKey:@"$ios_ifa"];
     }
 
     return [NSDictionary dictionaryWithDictionary:properties];
@@ -375,12 +370,9 @@ static Mixpanel *sharedInstance = nil;
 - (NSString *)defaultDistinctId
 {
     NSString *distinctId = nil;
-    if (NSClassFromString(@"ASIdentifierManager")) {
-        distinctId = ASIdentifierManager.sharedManager.advertisingIdentifier.UUIDString;
-    }
-    if (!distinctId) {
-        distinctId = ODIN1();
-    }
+	
+	distinctId = ODIN1();
+
     if (!distinctId) {
         NSLog(@"%@ error getting default distinct id: both iOS IFA and ODIN1 failed", self);
     }
@@ -1069,9 +1061,7 @@ static Mixpanel *sharedInstance = nil;
     [properties setValue:[device systemVersion] forKey:@"$ios_version"];
     [properties setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleVersion"] forKey:@"$ios_app_version"];
     [properties setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"] forKey:@"$ios_app_release"];
-    if (NSClassFromString(@"ASIdentifierManager")) {
-        [properties setValue:ASIdentifierManager.sharedManager.advertisingIdentifier.UUIDString forKey:@"$ios_ifa"];
-    }
+
     return [NSDictionary dictionaryWithDictionary:properties];
 }
 
