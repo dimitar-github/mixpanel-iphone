@@ -370,8 +370,12 @@ static Mixpanel *sharedInstance = nil;
 - (NSString *)defaultDistinctId
 {
     NSString *distinctId = nil;
-	
-	distinctId = ODIN1();
+
+	if (PTGetIOSVersion() < PTIOSVersion6) {
+		distinctId = ODIN1();
+	} else {
+		distinctId = [[[UIDevice currentDevice] identifierForVendor] UUIDString];
+	}
 
     if (!distinctId) {
         NSLog(@"%@ error getting default distinct id: both iOS IFA and ODIN1 failed", self);
